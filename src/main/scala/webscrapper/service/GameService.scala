@@ -36,9 +36,9 @@ class GameService extends Repository with Logger with FileSystem {
 
   def loadGame(url: String, useCache: Boolean = true): Option[Game] = {
     require(!url.isEmpty && url.length >= 7)
-    val id = url.substring(url.length - 7).toLong
+    val id = url.substring(url.length - 7).toInt
     log(s"Fetching game $id")
-    val game = if (useCache) load(id) else Left(None)
+    val game = if (useCache) exist(id) else Left(None)
     game match {
       case Left(_) => Some(InvalidGame)
       case Right(option) => option match {
@@ -49,6 +49,7 @@ class GameService extends Repository with Logger with FileSystem {
               log(s"Game $id is fetched"); loaded
             case Failure(f) => {
               f.printStackTrace
+              println(s"game $id is broken")
               log(s"Error encountered $f")
               f match {
                 case e: StoppedException => addInvalid(id, e.getMessage)
@@ -58,7 +59,7 @@ class GameService extends Repository with Logger with FileSystem {
             }
           }
         }
-        case Some(x) => Some(LogParser.parse(readGame(x).get, false).get.run.get)
+        case Some(x) => Some(LogParser.parse(readGame(id).get, false).get.run.get)
       }
     }
   }

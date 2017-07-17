@@ -91,7 +91,7 @@ class GameController {
     val years = if(sy != null) sy.split(",").map(_.toInt).toList else List(2012, 2017)
     val monthes = if(sm != null) sm.split(",").map(_.toInt).toList else List(1, 12)
     val days = if(sd != null) sd.split(",").map(_.toInt).toList else List(1, 31)
-    val games = gameService.searchGames(location, result, roles, player, players, countPl(0), countPl(1), countR(0), countR(1), years(0), years(1), monthes(0), monthes(1), days(0), days(1))
+    val games = gameService.searchGames(location, result, roles, Option(player), players, countPl(0), countPl(1), countR(0), countR(1), years(0), years(1), monthes(0), monthes(1), days(0), days(1))
     model.addAttribute("games", games)
     model.addAttribute("converter", new Converter)
     "searchResult";

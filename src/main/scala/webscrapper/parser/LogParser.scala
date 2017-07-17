@@ -71,7 +71,7 @@ object LogParser extends Logger {
   }  
   
   private def filterActions(implicit document: Document, gamers: List[Player]) = {
-    val chat = messages.mkString(" ").replaceAll("<br>", "&br&")
+    val chat = messages.mkString(" ").replaceAll("<br>", "&br&").replaceAll("&nbsp;", " ")
     //println(chat)
     val mess = chat.split("&br&").map(_.trim).filter(!_.isEmpty).toList
     val actionPairs = mess.map(_.splitAt(6))

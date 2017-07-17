@@ -20,7 +20,7 @@ object GamesExtractor extends GameService {
           if !g.contains("Сумеречный")
         } yield row
      val gameIds = filtered.map(_.select("td").get(1).select("a").attr("href").substring(5)).toList
-     val games = gameIds.map(id => loadGame(id)).toList
+     val games = gameIds.par.map(id => loadGame(id)).toList
      val notLoaded = gameIds diff games.filter(_.isDefined).map(_.get.id.toString)
      notLoaded
   }

@@ -31,11 +31,17 @@ object App {
 
   def main(args : Array[String]) {
 
-  /*val regex = """\[ОМОНОВЕЦ\] [\s\S]*  <b> (?:убит|убита|убит\(а\))</b>""".r
-
-  println(regex.findFirstIn("[ОМОНОВЕЦ] Честная  <b> убита</b>").isDefined)*/
+    val regex = """\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: cyan;\">Маньяк (.*?) убивает (.+).</b>""".r
+    val str = "[ОМОНОВЕЦ]  <b style=\"text-decoration: underline; color: cyan;\">Маньяк мафия убивает убивает N_a_s_t_y_a.</b>"
+    str match {
+      case regex(a1, a2) => {
+        println(a1 + a2)
+      }
+      case _=> println("Fuck")
+    }
+    //2720229,2815241,3694168
     val s = new GameService
-    val g = s.loadGame("2299165", true)
+    val g = s.loadGame("2400270", true)
     println(g)
     /*val service = new GameService
     val parts = FileParser.parseParts(Properties.path + "partii.txt")

@@ -17,14 +17,16 @@ sealed trait Event {
   protected def condition(action: String): Boolean = false
   protected def patterns: List[String] = List()
   protected def regex: Option[Regex] = None
-  protected def isMessage(implicit action: String) = action.contains("<font class=\"chat_text\">")
+  protected def isMessage(implicit action: String) = action.contains("<font class=\"chat_text\">") || action.contains("<span class=\"chat_text\">")
   protected def specialCondition(implicit action: String, game: GameSimulation) = true
-  private def canApply(implicit action: String, game: GameSimulation) = !isMessage && specialCondition(action, game) && (patterns.find(action contains _).size > 0 || (regex.isDefined && applyRegex(action, regex.get).size > 0))
-  protected def applyRegex(text: String, regex: Regex) = {
+  private def canApply(implicit action: String, game: GameSimulation) = !isMessage && specialCondition(action, game) && (patterns.find(action contains _).size > 0 || (regex.isDefined && applyRegex(action, regex.get, game, false).size > 0))
+  protected def applyRegex(text: String, regex: Regex, game: GameSimulation, fallback:Boolean) : Seq[String] = {
     text match {
-      case regex(player1, player2) => cleanName(player1, player2)
-      case regex(player1) => cleanName(player1)
-      case _ => List.empty
+      case regex(player1, player2) if(game.findPlayer(player1).isDefined && game.findPlayer(player2).isDefined) => cleanName(player1, player2)
+      case regex(player1) if (game.findPlayer(player1).isDefined) => cleanName(player1) 
+      case _ => {
+        if (fallback) game.players.map(p => (p,text.indexOf(p.name))).filter(_._2 != -1).sortBy(_._2).map(_._1.name) else List.empty
+      }
     }
   }
   
@@ -40,7 +42,7 @@ sealed trait ActionEvent extends Event {
   
   private def findPlayers(implicit text: String, game: GameSimulation) = {
     val replaced = text.trim
-    applyRegex(replaced, regex.get).flatMap(game.findPlayer).toList
+    applyRegex(replaced, regex.get, game, true).flatMap(game.findPlayer).toList
   }
   
   override def apply(implicit action: (String,Int), game: GameSimulation) = {
@@ -52,7 +54,7 @@ sealed trait ActionEvent extends Event {
 }
 
 case object TimeoutEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline;\">Игрок (.+) вышел из партии по таймауту.</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline;\">Игрок (.+?)вышел из партии по таймауту.</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.timeout(players.head)
   override def countPlayers = 1
 }
@@ -68,7 +70,7 @@ case object CitizenRoundStartedEvent extends FinishRoundEvent {
 }
 
 case object CitizenRoundVoteEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline;\">(.+) xочет отправить в тюрьму (.+)</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline;\">(.+?)xочет отправить в тюрьму (.+)</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.addVote(new Vote(players.head, players.last))
 }
 
@@ -78,7 +80,7 @@ case object DoctorSavedEvent extends Event {
 }
 
 case object DoctorVotedEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: lightgreen;\">Врач (.+) пытается вылечить (.+).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: lightgreen;\">Врач (.+?)пытается вылечить (.+).</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.doctorAttempt(players.head, players.last)
 }
 
@@ -103,12 +105,12 @@ case object SkipKillEvent extends ActionEvent {
 
 case object KillEvent extends ActionEvent {
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.kill(players(0))
-  override def regex = Some("""\[ОМОНОВЕЦ\] [\s\S]*  <b>(.+)(?:убит|убита|убит\(а\))</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\] [\s\S]*  <b>(.+?)(?:убит|убита|убит\(а\))</b>""".r)
   override def countPlayers = 1
 }
 
 case object KomissarCheckedEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: #d5c32d;\">Комиссар (.+) проверил жителя (.+).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: #d5c32d;\">Комиссар (.+?)проверил жителя (.+).</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.check(players(0), players(1))
 }
 
@@ -123,17 +125,17 @@ case object MafiaRoundStartedEvent extends FinishRoundEvent {
 }
 
 case object MafiaVotedEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: red;\">Мафиози (.+) пытается убить (.+).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: red;\">Мафиози (.+?)пытается убить (.+).</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.mafiaVoted(players.head, players.last)
 }
 
 case object ManiacVotedEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: cyan;\">Маньяк (.+) убивает (.+).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: cyan;\">Маньяк (.+?)убивает (.+).</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.maniacKill(players.head, players.last)
 }
 
 case object MorozEvent extends ActionEvent {
-  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: #990000;\">Босс (.+) морозит (.+).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\]  <b style=\"text-decoration: underline; color: #990000;\">Босс (.+?)морозит (.+).</b>""".r)
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.freeze(players.head, players.last)
 }
 
@@ -144,13 +146,13 @@ case object MorozEvent extends ActionEvent {
 
 case object PlayerPrisonedEvent extends ActionEvent {
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.goPrizon(players.head)
-  override def regex = Some("""\[ОМОНОВЕЦ\] [\s\S]*  <b>(.+) (?:отправлен в тюрьму|отправлена в тюрьму|отправлен\(а\) в тюрьму).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\] [\s\S]*  <b>(.+?)(?:отправлен в тюрьму|отправлена в тюрьму|отправлен\(а\) в тюрьму).</b>""".r)
   override def countPlayers = 1
 }
 
 case object OmonPrisonedEvent extends ActionEvent {
   override def applyAction(implicit players: List[Player], game: GameSimulation) = game.goPrizonOnOmon(players.head)
-  override def regex = Some("""\[ОМОНОВЕЦ\][\s\S]*Рассвирепевший ОМОНОВЕЦ, не разбираясь, кто прав, кто виноват[\s\S]*  <b>(.+) (?:будет отправлен в тюрьму|будет отправлена в тюрьму|будет отправлен\(а\) в тюрьму).</b>""".r)
+  override def regex = Some("""\[ОМОНОВЕЦ\][\s\S]*Рассвирепевший ОМОНОВЕЦ, не разбираясь, кто прав, кто виноват[\s\S]*  <b>(.+?)(?:будет отправлен в тюрьму|будет отправлена в тюрьму|будет отправлен\(а\) в тюрьму).</b>""".r)
   override def countPlayers = 1
 
 }
@@ -174,7 +176,7 @@ case object SkipEvent extends Event {
   override def patterns = List("[ОМОНОВЕЦ] Минуточку, распределяем роли.", "[ОМОНОВЕЦ] Дадим время договориться мафии. Приват включен!!!",
       "[ОМОНОВЕЦ] Игра началась!!! В игре участвуют:", "[ОМОНОВЕЦ] Внимание! Сейчас будет следующий ход.", "[ОМОНОВЕЦ] Считаем трупы!!! Результат хода честных людей.",
       "[ОМОНОВЕЦ] Считаем трупы! Результаты ночных беспорядков.", "[ОМОНОВЕЦ] Договориться не смогли.", "[ОМОНОВЕЦ]  <b>Сержант получает повышение. Мои поздравления, господин комиссар.</b>",
-      "[ОМОНОВЕЦ] Маньяк проспал свой ход", "Воспользовался правом выйти из партии.</b>", "что-то шепнул", "<b> убит")
+      "[ОМОНОВЕЦ] Маньяк проспал свой ход", "Воспользовался правом выйти из партии.</b>", "Воспользовался правом выйти из партии.</b>", "что-то шепнул", "<b> убит")
 
   override def apply(implicit action: (String,Int), game: GameSimulation) = ()
 }

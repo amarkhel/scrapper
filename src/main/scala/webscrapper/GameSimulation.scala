@@ -285,12 +285,19 @@ class GameSimulation(val id: Long, val location: Location, val start: LocalDateT
 
   def makeMessage(action: (String, Int)) = {
     try {
-      val text = action._1.erase("<font class=\"chat_text\">", "</font>")
+      val text = action._1.erase("<font class=\"chat_text\">", "</font>", "<span class=\"chat_text\">", "</span>")
       val smiles = text.findAll("""http([^\s-]+)gif""")
       val who = findPlayer(text.between("[", "]"))
       //println(text)
-      val content = text.erase("\\[", who.get.name, "\\]")
-      addMessage(new Message(who.get, content, smiles, action._2))
+      if (who.isDefined) {
+        val content = text.erase("\\[", who.get.name, "\\]")
+        addMessage(new Message(who.get, content, smiles, action._2))
+      } else if (action._2 == 0) {
+        println("Message before game started " + action._1)
+      } else {
+        throw new Exception()
+      }
+      
     } catch {
       case e: Exception => e.printStackTrace; log("Failed message:" + action._1); throw e
     }
@@ -316,7 +323,7 @@ class GameSimulation(val id: Long, val location: Location, val start: LocalDateT
     val mess = act._1
     val time = act._2
     val addon = start.plusSeconds(time).format(DateTimeFormatter.ofPattern("HH:mm:ss"))
-    val replaced = mess.replaceAll("<font class=\"chat_text\">", "").replaceAll("</font>", "").replaceAll("<b style=\"text-decoration: underline;\">", "").replaceAll("<img ", "<img style=\"width:auto;height:auto\" ")
+    val replaced = mess.replaceAll("<font class=\"chat_text\">", "").replaceAll("</font>", "").replaceAll("<b style=\"text-decoration: underline;\">", "").replaceAll("<img ", "<img style=\"width:auto;height:auto\" ").replaceAll("<span class=\"chat_text\">", "")
     val system = replaced.startsWith("[ОМОНОВЕЦ]")
     val a = addon + replaced
     val who = findPlayer(replaced.between("[", "]"))
